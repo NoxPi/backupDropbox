@@ -17,6 +17,14 @@ def handle_error(Exception, e):
     print "Exiting..."
     exit()
 
+def signal_handler(signal, frame):
+    print 'You pressed Ctrl+C!'
+    sys.exit(0)
+
+def log_info(message):
+    write_to_log("info", message)
+    return message
+
 def check_env():
     try:
         out = subprocess.Popen(["which", "dropbox"], stdout=subprocess.PIPE)
@@ -28,14 +36,12 @@ def check_env():
 
 def run_command(command):
     try:
-        output = subprocess.Popen(command.split(), stderr=subprocess.STDOUT, stdout=subprocess.PIPE)
+        output = subprocess.Popen(command.split(), stderr=subprocess.PIPE, stdout=subprocess.PIPE)
         return output.stdout.read().strip()
     except Exception, e:
         handle_error(Exception, e)
 
 def main():
-    subprocess.call("clear")
-
     try:
         check_env()
     except Exception, e:
@@ -44,17 +50,15 @@ def main():
     # Start dropboxd
     print "Attempting to start dropboxd"
     try:
-        subprocess.call("dropbox start".split())
+        if not subprocess.call("dropbox running".split()):
+            subprocess.call("dropbox start".split())
     except Exception, e:
         handle_error(Exception, "Couldn't run the \"dropbox\" command")
 
     # Ensure that dropbox is running
-    running = False
     timeout = 10
-    while not running:
-        if run_command("dropbox status") != "Dropbox isn't running!":
-            running = True
-        elif timeout == 0:
+    while not subprocess.call("dropbox running".split()):
+        if timeout == 0:
             handle_error(Exception, "Couldn't start dropboxd")
         else:
             sys.stdout.write(".")
@@ -63,15 +67,34 @@ def main():
             time.sleep(1)
 
     # Check status
-    #subprocess.call(["dropbox", "status"])
+    print "Sync status:\n"
+    timeout = 60
+    print "Initializing..."
+
+    while True:
+        status = run_command("dropbox status")
+        if timeout == 0:
+            print log_info("Nothing to sync")
+            break
+        elif status == "Up to date":
+            print status
+            timeout -= 10
+            time.sleep(10)
+        else:
+            subprocess.call(["dropbox", "status"])
+            time.sleep(1)
 
     # Stop dropboxd
     subprocess.call(["dropbox", "stop"])
-    #subprocess.call(["dropbox", "status"])
-
-    print "At end"
+    print "Finished"
     exit()
 
 if __name__ == "__main__":
-    main()
+    try:
+        main()
+    except KeyboardInterrupt:
+        if subprocess.call("dropbox running".split()):
+            print "\n"
+            subprocess.call(["dropbox", "stop"])
+        sys.exit(1)
 
