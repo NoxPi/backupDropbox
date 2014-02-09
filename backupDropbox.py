@@ -17,9 +17,11 @@ def handle_error(Exception, e):
     print "Exiting..."
     exit()
 
-def signal_handler(signal, frame):
-    print 'You pressed Ctrl+C!'
-    sys.exit(0)
+def to_number(input):
+    try:
+        return int(input)
+    except ValueError:
+        return False
 
 def log_info(message):
     write_to_log("info", message)
@@ -42,6 +44,7 @@ def run_command(command):
         handle_error(Exception, e)
 
 def main():
+    log_info("Syncing started")
     try:
         check_env()
     except Exception, e:
@@ -68,20 +71,36 @@ def main():
 
     # Check status
     print "Sync status:\n"
-    timeout = 60
     print "Initializing..."
+
+    timeout = 60
+    downloaded = False
+    files = 0
 
     while True:
         status = run_command("dropbox status")
-        if timeout == 0:
-            print log_info("Nothing to sync")
+        if downloaded and status.lower() == "up to date":
+            if to_number(files):
+                print log_info("Done syncing. " + files + " files synced up")
+            else:
+                print log_info("Done syncing. " + files + " synced up")
+
+            break
+        elif timeout == 0:
+            print log_info("Nothing to sync. Everything up to date")
             break
         elif status == "Up to date":
             print status
-            timeout -= 10
-            time.sleep(10)
+            timeout -= 1
+            time.sleep(1)
         else:
-            subprocess.call(["dropbox", "status"])
+            if ("downloading" in status.lower().split() and
+                "downloading file list..." not in status.lower()):
+                downloaded = True
+                if files < status.split()[1]:
+                    files = status.split()[1].replace("(", "")
+
+            print status
             time.sleep(1)
 
     # Stop dropboxd
@@ -96,5 +115,6 @@ if __name__ == "__main__":
         if subprocess.call("dropbox running".split()):
             print "\n"
             subprocess.call(["dropbox", "stop"])
+            handle_error(KeyboardInterrupt, "The script was interrupted by user")
         sys.exit(1)
 
