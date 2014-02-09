@@ -7,9 +7,9 @@ import sys
 
 def write_to_log(priority, message):
     if priority == "info":
-        syslog.syslog(syslog.LOG_INFO, message)
+        syslog.syslog(syslog.LOG_INFO, str(message))
     elif priority == "error":
-        syslog.syslog(syslog.LOG_ERR, message)
+        syslog.syslog(syslog.LOG_ERR, str(message))
 
 def handle_error(Exception, e):
     write_to_log("error", e)
@@ -45,22 +45,18 @@ def run_command(command):
 
 def main():
     log_info("Syncing started")
-    try:
-        check_env()
-    except Exception, e:
-        handle_error(Exception, e)
 
     # Start dropboxd
     print "Attempting to start dropboxd"
     try:
-        if not subprocess.call("dropbox running".split()):
-            subprocess.call("dropbox start".split())
+        if not subprocess.call("/usr/local/bin/dropbox running".split()):
+            subprocess.call("/usr/local/bin/dropbox start".split())
     except Exception, e:
         handle_error(Exception, "Couldn't run the \"dropbox\" command")
 
     # Ensure that dropbox is running
     timeout = 10
-    while not subprocess.call("dropbox running".split()):
+    while not subprocess.call("/usr/local/bin/dropbox running".split()):
         if timeout == 0:
             handle_error(Exception, "Couldn't start dropboxd")
         else:
@@ -78,7 +74,7 @@ def main():
     files = 0
 
     while True:
-        status = run_command("dropbox status")
+        status = run_command("/usr/local/bin/dropbox status")
         if downloaded and status.lower() == "up to date":
             if to_number(files):
                 print log_info("Done syncing. " + files + " files synced up")
@@ -104,7 +100,7 @@ def main():
             time.sleep(1)
 
     # Stop dropboxd
-    subprocess.call(["dropbox", "stop"])
+    subprocess.call(["/usr/local/bin/dropbox", "stop"])
     print "Finished"
     exit()
 
@@ -112,9 +108,9 @@ if __name__ == "__main__":
     try:
         main()
     except KeyboardInterrupt:
-        if subprocess.call("dropbox running".split()):
+        if subprocess.call("/usr/local/bin/dropbox running".split()):
             print "\n"
-            subprocess.call(["dropbox", "stop"])
+            subprocess.call(["/usr/local/bin/dropbox", "stop"])
             handle_error(KeyboardInterrupt, "The script was interrupted by user")
         sys.exit(1)
 
